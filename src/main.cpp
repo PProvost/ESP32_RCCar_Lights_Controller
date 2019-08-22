@@ -13,7 +13,7 @@
 #define CHANNEL_RIGHT_SIGNAL 4
 
 #define BLINK_PERIOD_MS 500
-#define TASK_DELAY 100 // used for debugging
+#define TASK_DELAY 100         // used for debugging
 #define PULSEIN_TIMOUT 25000UL // micro-seconds - smaller is more responsive, too small and it won't read
 
 #define PWM_MIN 900
@@ -111,17 +111,10 @@ void loop()
   handleSteeringPwm(channelStatesTemp);
   handleThrottlePwm(channelStatesTemp);
 
-  // Atomic update of state
-  // if (xSemaphoreTake(channelStatesSemaphore, (TickType_t)100) == pdTRUE)
-  {
-    for (channel = 0; channel < NUM_CHANNELS; channel++)
-      ChannelStates[channel] = channelStatesTemp[channel];
-    // xSemaphoreGive(channelStatesSemaphore);
-  }
+  for (channel = 0; channel < NUM_CHANNELS; channel++)
+    ChannelStates[channel] = channelStatesTemp[channel];
 
-  // vTaskDelay(TASK_DELAY); // TODO - make 100 or smaller after debugging
   yield();
-  // delay(500); // TODO - make 100 or smaller after debugging
 }
 
 typedef enum
@@ -218,10 +211,6 @@ void inputMonitorTaskHandler(void *parameter)
 {
   int channelStatesTemp[NUM_CHANNELS];
 
-  // Semaphore must exist or the task can't run
-  // if (channelStatesSemaphore == NULL)
-  //   return;
-
   while (1) // loop()
   {
     // Default if no rule fires is for the LED to be off.
@@ -233,13 +222,8 @@ void inputMonitorTaskHandler(void *parameter)
     handleSteeringPwm(channelStatesTemp);
     handleThrottlePwm(channelStatesTemp);
 
-    // Atomic update of state
-    // if (xSemaphoreTake(channelStatesSemaphore, (TickType_t)100) == pdTRUE)
-    {
-      for (int channel = 0; channel < NUM_CHANNELS; channel++)
-        ChannelStates[channel] = channelStatesTemp[channel];
-      // xSemaphoreGive(channelStatesSemaphore);
-    }
+    for (int channel = 0; channel < NUM_CHANNELS; channel++)
+      ChannelStates[channel] = channelStatesTemp[channel];
 
     vTaskDelay(TASK_DELAY); // TODO - make 100 or smaller after debugging
   }
@@ -254,21 +238,11 @@ void ledTaskHandler(void *parameter)
 
   Serial.printf("ledTaskHandler() running on core %d\n", xPortGetCoreID());
 
-  // Semaphore must exist or the task can't run
-  // if (channelStatesSemaphore == NULL)
-  //   return;
-
   while (1) // loop()
   {
-    // Copy the shared state into local and release the semaphore
-    // if (xSemaphoreTake(channelStatesSemaphore, (TickType_t)100) == pdTRUE)
-    {
-      for (int channel = 0; channel < NUM_CHANNELS; channel++)
-        channelStatesTemp[channel] = ChannelStates[channel];
-      // xSemaphoreGive(channelStatesSemaphore);
-    }
-    // else
-    // continue;
+    // Copy the shared state into local storage
+    for (int channel = 0; channel < NUM_CHANNELS; channel++)
+      channelStatesTemp[channel] = ChannelStates[channel];
 
     for (channel = 0; channel < NUM_CHANNELS; channel++)
     {
