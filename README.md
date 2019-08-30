@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/PProvost/ESP32_RCCar_Lights_Controller.svg?branch=master)](https://travis-ci.org/PProvost/ESP32_RCCar_Lights_Controller)
+
 # Wizard's LED Light Controller for RC Cars/Trucks
 
 ESP32-based. No additional hardware required. Pretty much any
