@@ -4,12 +4,16 @@ ESP32-based. No additional hardware required. Pretty much any
 ESP32 module/board will work, as long as it has enough GPIO pins.
 For mine, I used the ESP32-Pico-Kit board.
 
+IMPORTANT: This project was created with Platformio. If you are using another
+development tool, you may need to move some files around, author a makefile,
+etc.
+
 ## Architecture
 
 Two independent FreeRTOS Tasks
 
-- First task - Monitors the incoming PWM feed, writes to shared global state
-- Second task - Update light groups
+- Main code (setup & loop) - Monitors the incoming PWM feed, writes to shared global state
+- Second task - Update light groups based on shared global state
 
 ## Controls & Inputs
 
@@ -39,7 +43,7 @@ These are the states that are set in the Input Processing task.
   - HEADLIGHTS_ON - pwm high or jumper closed
   - HEADLIGHTS_OFF - pwm low or jumper open
 - Movement direction
-  - Forward - throttlw pwm high
+  - Forward - throttle pwm high
   - Reverse - throttle pwm low
   - Braking - throttle pwm center
 - Turning
@@ -60,6 +64,9 @@ The following rules are processed in order every time through the loop,
 allowing later rules to override earlier ones.
 
 ```
+No Input PWM signal:
+    Blink everything
+
 Headlights: On
     HEADLIGHTS_LED_GROUP to HEADLIGHTS_LEVEL_ON
     TAILLIGHTS_LED_GROUP to TAILLIGHTS_LEVEL_ON
@@ -85,9 +92,9 @@ Movement Direction: Braking
     TAILLIGHTS_LED_GROUP to TAILLIGHTS_LEVEL_BRAKING
     REVERSELIGHTS_LED_GROUP REVERSELIGHTS_LEVEL_OFF
 
-Special: high beams
+Special: high beams (not implemented yet)
     HEADLIGHTS_LED_GROUP to HEADLIGHT_LEVEL_HIGH
-Special: hazards
+Special: hazards (not implemented yet)
     LEFTSIGNALS_LED_GROUP to SIGNALS_LEVEL_ON
     RIGHTSIGNALS_LED_GROUP to SIGNALS_LEVEL_ON
 ```
