@@ -97,7 +97,6 @@
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": "${workspaceRoot}/.vscode/.browse.c_cpp.db",
                 "path": [
                     "c:/dev/ESP32_RCCar_Lights_Controller/include",
                     "c:/dev/ESP32_RCCar_Lights_Controller/src",
@@ -190,7 +189,7 @@
                 ]
             },
             "defines": [
-                "PLATFORMIO=40000",
+                "PLATFORMIO=40003",
                 "ARDUINO_ESP32_PICO",
                 "ESP32",
                 "ESP_PLATFORM",

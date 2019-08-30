@@ -1,64 +1,14 @@
 #include <Arduino.h>
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <freertos/FreeRTOS.h>
-// #include <freertos/task.h>
+#include "configuration.h"
 
-// CHANNELS
-#define NUM_CHANNELS 5
-#define CHANNEL_HEAD_LIGHTS 0
-#define CHANNEL_BRAKE_LIGHTS 1
-#define CHANNEL_BACKUP_LIGHTS 2
-#define CHANNEL_LEFT_SIGNAL 3
-#define CHANNEL_RIGHT_SIGNAL 4
-
-#define BLINK_PERIOD_MS 500
-#define TASK_DELAY 100         // used for debugging
-#define PULSEIN_TIMOUT 25000UL // micro-seconds - smaller is more responsive, too small and it won't read
-
-#define PWM_MIN 900
-#define PWM_CENTER 1500
-#define PWM_MAX 2100
-#define PWM_BAND_SEP_LOW 1350
-#define PWM_BAND_SEP_HIGH 1650
-
-#define CENTER_BAND_SIZE 300 // 300 means center is from 1350-1650
-
-// GPIO PINS - check here: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
-
-const int InputPin_Headlights = 34;
-const int InputPin_Steering = 35;
-const int InputPin_Throttle = 37;
-const int InputPin_Aux2 = 39;
-
-// DEFINE THE OUTPUT LED PINS WE WILL USE FOR LIGHTS
-// Note: Set the second value to -1 if you only need one pin for that channel
-const int LedPins[NUM_CHANNELS][2] = {
-    {21, 25}, // Headlights
-    {23, 33}, // Brake lights
-    {18, 27}, // Backup lights
-    {26, 32}, // Left signals
-    {19, 22}  // Right signals
-};
-
-// DEFINE THE CHANNEL STATES
-// Note: Adjust the constants below (not the mask) to change the intensities for the different states
-#define CHANNEL_STATE_OFF 0
-#define CHANNEL_STATE_ON 100
-#define CHANNEL_STATE_HIGH 0xFF           // 255
-#define CHANNEL_STATE_MASK_BLINK (1 << 8) // You can Bitwise-OR this with the value to make it blink
-
-int ChannelStates[NUM_CHANNELS] = {
+// Shared state to store each LED output value (including a bitmask for blink)
+int channelStates[NUM_CHANNELS] = {
     0, // CHANNEL_HEAD_LIGHTS
     0, // CHANNEL_BRAKE_LIGHTS
     0, // CHANNEL_BACKUP_LIGHTS
     0, // CHANNEL_LEFT_SIGNAL
     0, // CHANNEL_RIGHT_SIGNAL
 };
-
-// Output PWM properties for LED channels
-const int freq = 5000;
-const int resolution = 8;
 
 // Forward declarations
 void ledTaskHandler(void *parameter);
@@ -72,14 +22,13 @@ void setup()
 {
   Serial.begin(115200);
   Serial.println("Starting");
-
-  Serial.printf("setup() running on core %d\n", xPortGetCoreID());
+  Serial.printf("setup() and loop() running on core %d\n", xPortGetCoreID());
 
   // Configure Output LED PWM channels & LedPins
   for (unsigned int channel = 0; channel < NUM_CHANNELS; channel++)
   {
 
-    ledcSetup(channel, freq, resolution);
+    ledcSetup(channel, OUTPUT_PWM_FREQ, OUTPUT_PWM_RES);
     for (unsigned int i = 0; i < 2; i++)
       if (LedPins[channel][i] > -1)
       {
@@ -88,9 +37,9 @@ void setup()
   }
 
   // Configure input pins for PWM, buttons, etc.
-  pinMode(InputPin_Headlights, INPUT);
   pinMode(InputPin_Steering, INPUT);
   pinMode(InputPin_Throttle, INPUT);
+  pinMode(InputPin_Headlights, INPUT);
   // pinMode(InputPin_Aux2, INPUT);
 
   // Start a tasks for the LED update code
@@ -112,7 +61,7 @@ void loop()
   handleThrottlePwm(channelStatesTemp);
 
   for (channel = 0; channel < NUM_CHANNELS; channel++)
-    ChannelStates[channel] = channelStatesTemp[channel];
+    channelStates[channel] = channelStatesTemp[channel];
 
   yield();
 }
@@ -152,9 +101,10 @@ void handleHeadlightsPwm(int *states)
     states[CHANNEL_HEAD_LIGHTS] = CHANNEL_STATE_ON;
     break;
   default:
-    states[CHANNEL_HEAD_LIGHTS] = CHANNEL_STATE_OFF;
     break;
   }
+
+  // Serial.printf("Headlights PWM: %lu (%d) -> (0x%x)\n", headlightsPwm, headlightsPwmState, states[CHANNEL_BRAKE_LIGHTS]);
 }
 
 void handleThrottlePwm(int *states)
@@ -172,13 +122,15 @@ void handleThrottlePwm(int *states)
     states[CHANNEL_BRAKE_LIGHTS] = CHANNEL_STATE_ON;
     break;
   case PWMSTATE_HIGH:
+    break;
   case PWMSTATE_LOW:
+    states[CHANNEL_BACKUP_LIGHTS] = CHANNEL_STATE_ON;
+    break;
   default:
-    states[CHANNEL_BRAKE_LIGHTS] = CHANNEL_STATE_OFF;
     break;
   }
 
-  Serial.printf("Throttle PWM: %lu (%d) -> (0x%x)\n", throttlePwm, throttlePwmState, states[CHANNEL_BRAKE_LIGHTS]);
+  // Serial.printf("Throttle PWM: %lu (%d) -> (0x%x)\n", throttlePwm, throttlePwmState, states[CHANNEL_BRAKE_LIGHTS]);
 }
 
 void handleSteeringPwm(int *states)
@@ -207,76 +159,49 @@ void handleSteeringPwm(int *states)
   // Serial.printf("Steering PWM: %lu -> (0x%x:0x%x)\n", steeringPwm, states[CHANNEL_LEFT_SIGNAL], states[CHANNEL_RIGHT_SIGNAL]);
 }
 
-void inputMonitorTaskHandler(void *parameter)
-{
-  int channelStatesTemp[NUM_CHANNELS];
-
-  while (1) // loop()
-  {
-    // Default if no rule fires is for the LED to be off.
-    for (int i = 0; i < NUM_CHANNELS; i++)
-      channelStatesTemp[i] = CHANNEL_STATE_OFF;
-
-    // Input processing rules (order matters!)
-    handleHeadlightsPwm(channelStatesTemp);
-    handleSteeringPwm(channelStatesTemp);
-    handleThrottlePwm(channelStatesTemp);
-
-    for (int channel = 0; channel < NUM_CHANNELS; channel++)
-      ChannelStates[channel] = channelStatesTemp[channel];
-
-    vTaskDelay(TASK_DELAY); // TODO - make 100 or smaller after debugging
-  }
-}
-
 void ledTaskHandler(void *parameter)
 {
   bool isBlinking = false, lastBlinkOn = false;
-  int channel, channelState;
-  int channelStatesTemp[NUM_CHANNELS];
+  int channel, channelState, blinkState = CHANNEL_STATE_OFF;
+  // int channelStatesTemp[NUM_CHANNELS];
   TickType_t currentTicks = 0, lastBlinkTicks = 0;
 
   Serial.printf("ledTaskHandler() running on core %d\n", xPortGetCoreID());
 
-  while (1) // loop()
+  while (1) // equivalent of loop() for this task
   {
-    // Copy the shared state into local storage
-    for (int channel = 0; channel < NUM_CHANNELS; channel++)
-      channelStatesTemp[channel] = ChannelStates[channel];
+    // Figure out the blinking state (on or off) based on time
+    // Any channel with the blink flag will use this to control the blinking
+    currentTicks = xTaskGetTickCount() / portTICK_PERIOD_MS;
+    if ((currentTicks - lastBlinkTicks) > BLINK_PERIOD_MS) // Time to swap the blink state
+    {
+      if (lastBlinkOn)
+      {
+        blinkState = CHANNEL_STATE_OFF;
+        lastBlinkOn = false;
+      }
+      else
+      {
+        blinkState = CHANNEL_STATE_ON;
+        lastBlinkOn = true;
+      }
+      lastBlinkTicks = currentTicks;
+    }
 
+    // Process each output channel as required
     for (channel = 0; channel < NUM_CHANNELS; channel++)
     {
-      channelState = channelStatesTemp[channel];
+      channelState = channelStates[channel];
 
       isBlinking = ((channelState & CHANNEL_STATE_MASK_BLINK) >> 8) == 1;
       channelState &= 0xFF; // remove the mask
 
-      if (isBlinking == false)
-        ledcWrite(channel, channelState);
+      if (isBlinking)
+        ledcWrite(channel, (blinkState == CHANNEL_STATE_ON ? channelState : blinkState));
       else
-      {
-        currentTicks = xTaskGetTickCount() / portTICK_PERIOD_MS;
-
-        // Serial.printf("Blinking: %d, %d - ", currentTicks, lastBlinkTicks);
-
-        // if 500 ms have passed since turning it on, turn it off
-        if ((currentTicks - lastBlinkTicks) > BLINK_PERIOD_MS) // 0.5s have passed since we set the blinker on or off
-        {
-          // Serial.printf("[TOGGLE]\n");
-          if (lastBlinkOn)
-          {
-            ledcWrite(channel, CHANNEL_STATE_OFF);
-            lastBlinkOn = false;
-          }
-          else
-          {
-            ledcWrite(channel, channelState);
-            lastBlinkOn = true;
-          }
-          lastBlinkTicks = currentTicks;
-        }
-      }
+        ledcWrite(channel, channelState);
     }
-    vTaskDelay(TASK_DELAY); // TODO - make 100 or smaller after debugging
+    
+    vTaskDelay(TASK_DELAY);
   }
 }
