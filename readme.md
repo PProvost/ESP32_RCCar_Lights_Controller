@@ -29,7 +29,10 @@ Optional:
 - Headlights on/off (jumper or pwm channel)
 - Hazards on/off (jumper or pwm channel)
 
-## Jumpers
+## Jumpers / switch pins (not implemented yet)
+
+You can use the jumpers below to control some of the behaviors
+using a physical switch.
 
 - Headlights on/off jumper between pin X and (vcc/gnd)
 - Hazards on/off jumper between pin Y and (vcc/gnd)
@@ -39,9 +42,6 @@ Optional:
 
 These are the states that are set in the Input Processing task.
 
-- Mode - PWM input via PIN_X or switched via PIN_X
-  - HEADLIGHTS_ON - pwm high or jumper closed
-  - HEADLIGHTS_OFF - pwm low or jumper open
 - Movement direction
   - Forward - throttle pwm high
   - Reverse - throttle pwm low
@@ -103,5 +103,5 @@ After the logic is complete, the values are written to the LED controller and th
 
 ## Thoughts and ideas
 
-- Separate (optional) channel for a dedicated high beams led group
+- Separate (optional) channel for a dedicated high beams led group (instead of changing the brightness)
 - BLE control from mobile
