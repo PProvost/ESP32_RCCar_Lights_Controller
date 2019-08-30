@@ -28,7 +28,6 @@
 const int InputPin_Steering = 34;
 const int InputPin_Throttle = 35;
 const int InputPin_Headlights = 37;
-// const int InputPin_Aux2 = 39;
 
 // OUTPUT PINS - LED output pins (on is high)
 // Note: Set the second value to -1 if you only need one pin for that channel
@@ -42,6 +41,7 @@ const int LedPins[NUM_CHANNELS][2] = {
 
 // Adjust the constants below to change the intensities for the different states
 #define CHANNEL_STATE_OFF 0x00            // 0
+#define CHANNEL_STATE_DIM 0x64            // 100
 #define CHANNEL_STATE_ON 0xC0             // 192 (not 100% to save power and life of LED)
 #define BLINK_PERIOD_MS 500               // how fast a blinker goes in ms... 1/2 sec is about right
 
